@@ -36,3 +36,6 @@ data/*
 rsconnect/*
 desktop.ini
 .Rprofile
+.Rproj.user
+.Rdata
+.DS_Store
