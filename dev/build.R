@@ -153,7 +153,7 @@ scales_variables_modules <-
 
 # # Add access to amenities module
 # traveltimes <-
-# accessibility_get_travel_times(region_DA_IDs = census_scales$DA$ID)
+#   accessibility_get_travel_times(region_DA_IDs = census_scales$DA$ID)
 # qs::qsave(traveltimes, "dev/data/built/traveltimes.qs")
 traveltimes <- qs::qread("dev/data/built/traveltimes.qs")
 
@@ -175,8 +175,8 @@ scales_variables_modules$scales <-
 
 # Postal codes ------------------------------------------------------------
 
-postal_codes <- build_postal_codes(census_scales$DA$ID)
-qs::qsave(postal_codes, "data/postal_codes.qs")
+# postal_codes <- build_postal_codes(census_scales$DA$ID)
+# qs::qsave(postal_codes, "data/postal_codes.qs")
 
 
 # Map zoom levels ---------------------------------------------------------
@@ -190,7 +190,7 @@ map_zoom_levels_save(data_folder = "data/", map_zoom_levels = map_zoom_levels)
 
 tileset_upload_all(all_scales = scales_variables_modules$scales,
                    map_zoom_levels = map_zoom_levels,
-                   prefix = "to",
+                   prefix = "van",
                    tweak_max_zoom = tibble::tibble(),
                    username = "sus-mcgill",
                    access_token = .cc_mb_token)
@@ -198,20 +198,20 @@ tileset_upload_all(all_scales = scales_variables_modules$scales,
 tileset_labels(
   scales = scales_variables_modules$scales,
   crs = crs,
-  prefix = "to",
+  prefix = "van",
   username = "sus-mcgill",
   access_token = .cc_mb_token)
 
-street <- cc.data::db_read_data(table = "streets",
-                                column_to_select = "DA_ID",
-                                IDs = census_scales$DA$ID)
-qs::qsave(street, "dev/data/built/street.qs")
+# street <- cc.data::db_read_data(table = "streets",
+#                                 column_to_select = "DA_ID",
+#                                 IDs = census_scales$DA$ID)
+# qs::qsave(street, "dev/data/built/street.qs")
 street <- qs::qread("dev/data/built/street.qs")
 
 tileset_streets(master_polygon = base_polygons$master_polygon,
                 street = street,
                 crs = crs,
-                prefix = "to",
+                prefix = "van",
                 username = "sus-mcgill",
                 access_token = .cc_mb_token)
 
@@ -232,7 +232,7 @@ qs::qsave(colours_dfs, "data/colours_dfs.qs")
 
 # Write stories -----------------------------------------------------------
 
-# stories <- build_stories()
+# # stories <- build_stories()
 # stories_mapping <- stories$stories_mapping
 # stories <- stories$stories
 # qs::qsavem(stories, stories_mapping, file = "data/stories.qsm")
@@ -326,7 +326,7 @@ tictoc::toc()
 
 # Should be done once the data is saved
 
-future::plan(future::multisession(), workers = 4)
+future::plan(future::multisession(), workers = 2)
 
 pe_main_card_data <- placeex_main_card_data(scales = scales_variables_modules$scales,
                                             DA_table = census_scales$DA,
@@ -339,7 +339,7 @@ placeex_main_card_rmd(scales_variables_modules = scales_variables_modules,
                       regions_dictionary = regions_dictionary,
                       scales_dictionary = scales_dictionary,
                       lang = "en",
-                      tileset_prefix = "mtl",
+                      tileset_prefix = "van",
                       mapbox_username = "sus-mcgill",
                       rev_geocode_from_localhost = TRUE,
                       overwrite = FALSE)

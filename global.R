@@ -7,7 +7,7 @@ site_name <- "Curbcut Vancouver"
 city_name <- "Vancouver"
 site_url <- "https://vancouver.curbcut.ca"
 stories_page <- "Vancouver stories"
-tileset_prefix <- "to"
+tileset_prefix <- "van"
 mapbox_username <- "sus-mcgill"
 
 default_region <- "CMA"
@@ -15,7 +15,7 @@ default_region <- "CMA"
 default_random_address <- "4600 Cambie St, Vancouver, BC"
 
 map_zoom <- 9.1
-map_loc <- c(-122.73, 49.15)
+map_loc <- c(-122.77, 49.22)
 
 # Packages ----------------------------------------------------------------
 
