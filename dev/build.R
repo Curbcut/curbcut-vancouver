@@ -188,19 +188,6 @@ map_zoom_levels_save(data_folder = "data/", map_zoom_levels = map_zoom_levels)
 
 # Tilesets ----------------------------------------------------------------
 
-tileset_upload_all(all_scales = scales_variables_modules$scales,
-                   map_zoom_levels = map_zoom_levels,
-                   prefix = "van",
-                   tweak_max_zoom = tibble::tibble(),
-                   username = "sus-mcgill",
-                   access_token = .cc_mb_token)
-
-tileset_labels(
-  scales = scales_variables_modules$scales,
-  crs = crs,
-  prefix = "van",
-  username = "sus-mcgill",
-  access_token = .cc_mb_token)
 
 # street <- cc.data::db_read_data(table = "streets",
 #                                 column_to_select = "DA_ID",
@@ -214,6 +201,21 @@ tileset_streets(master_polygon = base_polygons$master_polygon,
                 prefix = "van",
                 username = "sus-mcgill",
                 access_token = .cc_mb_token)
+
+tileset_upload_all(all_scales = scales_variables_modules$scales,
+                   map_zoom_levels = map_zoom_levels,
+                   street = street,
+                   prefix = "van",
+                   tweak_max_zoom = tibble::tibble(),
+                   username = "sus-mcgill",
+                   access_token = .cc_mb_token)
+
+tileset_labels(
+  scales = scales_variables_modules$scales,
+  crs = crs,
+  prefix = "van",
+  username = "sus-mcgill",
+  access_token = .cc_mb_token)
 
 
 # Did you know ------------------------------------------------------------
