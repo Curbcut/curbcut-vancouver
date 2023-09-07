@@ -3,6 +3,7 @@
 
 # Load libraries ----------------------------------------------------------
 tictoc::tic()
+library(sf)
 library(cc.buildr)
 invisible(lapply(list.files("dev/data_import", full.names = TRUE), source))
 
@@ -107,7 +108,8 @@ all_scales <- c(census_scales,
 scales_consolidated <- consolidate_scales(all_tables = all_tables,
                                           all_scales = all_scales,
                                           regions = base_polygons$regions,
-                                          crs = crs)
+                                          crs = crs,
+                                          match_with_centroids_regions = NULL)
 
 
 # Verify conformity -------------------------------------------------------
@@ -129,10 +131,11 @@ save.image("dev/data/built/empty_scales.RData")
 load("dev/data/built/empty_scales.RData")
 # Build the datasets ------------------------------------------------------
 
-future::plan(list(future::tweak(future::multisession,
-                                workers = 2),
-                  future::tweak(future::multisession,
-                                workers = length(cc.data::census_years))))
+future::plan(future::multisession, workers = 4)
+# future::plan(list(future::tweak(future::multisession,
+#                                 workers = 2),
+#                   future::tweak(future::multisession,
+#                                 workers = length(cc.data::census_years))))
 
 scales_variables_modules <-
   ba_census_data(scales_variables_modules = scales_variables_modules,
@@ -141,15 +144,30 @@ scales_variables_modules <-
                  housing_module = TRUE)
 census_variables <- get_census_vectors_details()
 
+future::plan(future::multisession(), workers = 6)
+
 scales_variables_modules <-
   ru_vac_rate(scales_variables_modules = scales_variables_modules,
-              crs = crs, 
-              geo_uid = cancensus_cma_code,
+              crs = crs, geo_uid = cancensus_cma_code,
               approximate_name_match = FALSE)
 scales_variables_modules <-
-  ru_canale(scales_variables_modules = scales_variables_modules,
-            crs = crs,
-            region_DA_IDs = census_scales$DA$ID)
+  ru_alp(scales_variables_modules = scales_variables_modules,
+         crs = crs,
+         region_DA_IDs = census_scales$DA$ID)
+scales_variables_modules <-
+  ru_canbics(scales_variables_modules = scales_variables_modules,
+             crs = crs,
+             region_DA_IDs = census_scales$DA$ID)
+scales_variables_modules <-
+  ru_lst(scales_variables_modules = scales_variables_modules,
+         region_DA_IDs = census_scales$DA$ID,
+         crs = crs)
+
+scales_variables_modules <- 
+  ba_ndvi(scales_variables_modules = scales_variables_modules, 
+          master_polygon = base_polygons$master_polygon, 
+          all_scales = all_scales, data_output_path = "dev/data/ndvi/", 
+          crs = crs)
 
 # # Add access to amenities module
 # traveltimes <-
@@ -157,7 +175,7 @@ scales_variables_modules <-
 # qs::qsave(traveltimes, "dev/data/built/traveltimes.qs")
 traveltimes <- qs::qread("dev/data/built/traveltimes.qs")
 
-future::plan(future::multisession(), workers = 4)
+future::plan(future::multisession(), workers = 2)
 scales_variables_modules <-
   ba_accessibility_points(scales_variables_modules = scales_variables_modules,
                           region_DA_IDs = census_scales$DA$ID,
@@ -173,6 +191,12 @@ scales_variables_modules$scales <-
   cc.buildr::post_processing(scales = scales_variables_modules$scales)
 
 
+qs::qsavem(census_scales, scales_variables_modules, crs, census_variables,
+           scales_dictionary, regions_dictionary, all_tables, base_polygons,
+           all_scales,
+           file = "dev/data/built/scales_variables_modules.qsm")
+qs::qload("dev/data/built/scales_variables_modules.qsm")
+
 # Postal codes ------------------------------------------------------------
 
 # postal_codes <- build_postal_codes(census_scales$DA$ID)
@@ -181,41 +205,51 @@ scales_variables_modules$scales <-
 
 # Map zoom levels ---------------------------------------------------------
 
-map_zoom_levels <- map_zoom_levels_create_all(all_tables = all_tables)
+map_zoom_levels <- map_zoom_levels_create_all(
+  all_tables = all_tables,
+  zoom_levels = list(first = 0, CT = 10, DA = 12, building = 16))
 
 map_zoom_levels_save(data_folder = "data/", map_zoom_levels = map_zoom_levels)
 
 
 # Tilesets ----------------------------------------------------------------
 
+# Prepare by getting the census scales with geometries which spans over water
+# Build census scales
+full_census_scales <- 
+  build_census_scales(master_polygon = base_polygons$master_polygon,
+                      regions = base_polygons$province_cancensus_code,
+                      levels = c("CSD", "CT", "DA"),
+                      crs = crs,
+                      switch_full_geos = TRUE)
 
-# street <- cc.data::db_read_data(table = "streets",
-#                                 column_to_select = "DA_ID",
-#                                 IDs = census_scales$DA$ID)
-# qs::qsave(street, "dev/data/built/street.qs")
-street <- qs::qread("dev/data/built/street.qs")
 
-tileset_streets(master_polygon = base_polygons$master_polygon,
-                street = street,
-                crs = crs,
-                prefix = "van",
-                username = "sus-mcgill",
-                access_token = .cc_mb_token)
+# Do not upload grids, as there is a function just for it.
+all_scales_t <- scales_variables_modules$scales
+map_zoom_levels_t <- map_zoom_levels
 
-tileset_upload_all(all_scales = scales_variables_modules$scales,
-                   map_zoom_levels = map_zoom_levels,
-                   street = street,
+# Before loading the tilesets, switch the geometries.
+all_scales_t <- cc.buildr::map_over_scales(
+  all_scales_t,
+  fun = \(geo = geo, scales = scales,
+          scale_name = scale_name, scale_df = scale_df) {
+
+    # If it'S not census, return raw
+    if (!scale_name %in% names(full_census_scales)) return(scale_df)
+
+    df <- sf::st_drop_geometry(scale_df)
+    merge(df, full_census_scales[[scale_name]]["ID"], by = "ID", all.x = TRUE,
+          all.y = FALSE)
+
+  })
+
+
+tileset_upload_all(all_scales = all_scales_t,
+                   map_zoom_levels = map_zoom_levels_t,
                    prefix = "van",
-                   tweak_max_zoom = tibble::tibble(),
-                   username = "sus-mcgill",
+                   username = "curbcut",
                    access_token = .cc_mb_token)
 
-tileset_labels(
-  scales = scales_variables_modules$scales,
-  crs = crs,
-  prefix = "van",
-  username = "sus-mcgill",
-  access_token = .cc_mb_token)
 
 
 # Did you know ------------------------------------------------------------
@@ -236,18 +270,17 @@ qs::qsave(colours_dfs, "data/colours_dfs.qs")
 
 # # stories <- build_stories()
 # stories_mapping <- stories$stories_mapping
-# stories <- stories$stories
-# qs::qsavem(stories, stories_mapping, file = "data/stories.qsm")
+# qs::qsave(stories, file = "data/stories.qs")
 # stories_create_tileset(stories = stories,
 #                        prefix = "mtl",
-#                        username = "sus-mcgill",
+#                        username = "curbcut",
 #                        access_token = .cc_mb_token)
 
 scales_variables_modules$modules <-
   scales_variables_modules$modules |>
   add_module(
     id = "stories",
-    theme = NA,
+    theme = "Urban life",
     nav_title = "Vancouver stories",
     title_text_title = "Vancouver stories",
     title_text_main = paste0(
@@ -266,24 +299,27 @@ scales_variables_modules$modules <-
 scales_variables_modules$modules <-
   add_module(modules = scales_variables_modules$modules,
              id = "place_explorer",
-             theme = NA,
+             theme = "Explorer",
              nav_title = "Place explorer",
              title_text_title = "Place explorer",
              title_text_main = paste0(
                "<p>Select a location by entering a postal code or clicking on the ",
-               "map and see how it compares to the rest of the Montreal region ",
+               "map and see how it compares to the rest of the Vancouver region ",
                "or island across a variety of sustainability indicators."
              ),
              title_text_extra = paste0(
                "<p>The data in the Place Explorer is taken from other Curbcut pages with ",
-               "two exceptions: <a href = 'https://www.canuedata.ca/tmp/CANUE_METADATA",
-               "_NO2LUR_A_YY.pdf'>Air pollution</a> and <a href = 'https://www.canueda",
-               "ta.ca/tmp/CANUE_METADATA_GRAVH_AMN_YY.pdf'>green space</a> data are ta",
-               "ken from <a href = 'https://www.canuedata.ca'>CANUE</a>."
+               "the exception of <a href = 'https://www.canuedata.ca/tmp/CANUE_METADATA",
+               "_NO2LUR_A_YY.pdf'>Air pollution</a>."
              ),
              metadata = FALSE,
              dataset_info = "",
              regions = regions_dictionary$region[regions_dictionary$pickable])
+
+
+# Home page ---------------------------------------------------------------
+
+home_page()
 
 
 # Save variables ----------------------------------------------------------
@@ -329,22 +365,38 @@ tictoc::toc()
 # Should be done once the data is saved
 
 future::plan(future::multisession(), workers = 2)
+# pe_main_card_data <- placeex_main_card_data(scales = scales_variables_modules$scales,
+#                                             DA_table = census_scales$DA,
+#                                             region_DA_IDs = census_scales$DA$ID,
+#                                             crs = crs,
+#                                             regions_dictionary = regions_dictionary)
+# # ONLY KEEP FIRST SCALE
+# pe_main_card_data$main_card_data <- lapply(pe_main_card_data$main_card_data, lapply, `[`, 1)
+# pe_main_card_data$avail_df <- dplyr::distinct(pe_main_card_data$avail_df, region, .keep_all = TRUE)
+# 
+# qs::qsave(pe_main_card_data, file = "data/pe_main_card_data.qs")
+pe_main_card_data <- qs::qread("data/pe_main_card_data.qs")
 
-pe_main_card_data <- placeex_main_card_data(scales = scales_variables_modules$scales,
-                                            DA_table = census_scales$DA,
-                                            region_DA_IDs = census_scales$DA$ID,
-                                            crs = crs,
-                                            regions_dictionary = regions_dictionary)
+svm_first_scale <- scales_variables_modules
+svm_first_scale$scales <- lapply(svm_first_scale$scales, `[`, 1)
 
-placeex_main_card_rmd(scales_variables_modules = scales_variables_modules,
+svm_first_scale$variables$pe_include[36:53] <- rep(F, length(svm_first_scale$variables$pe_include[36:53]))
+
+library(curbcut)
+placeex_main_card_rmd(scales_variables_modules = svm_first_scale,
                       pe_main_card_data = pe_main_card_data,
                       regions_dictionary = regions_dictionary,
                       scales_dictionary = scales_dictionary,
                       lang = "en",
                       tileset_prefix = "van",
-                      mapbox_username = "sus-mcgill",
+                      mapbox_username = "curbcut",
                       rev_geocode_from_localhost = TRUE,
-                      overwrite = FALSE)
+                      overwrite = TRUE)
+
+
+# Save the place explorer files, which serves as a 'does it exist' for `curbcut`
+pe_docs <- list.files("www/place_explorer/", full.names = TRUE)
+qs::qsave(pe_docs, "data/pe_docs.qs")
 
 # Deploy app --------------------------------------------------------------
 
