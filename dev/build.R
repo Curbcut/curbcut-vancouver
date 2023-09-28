@@ -77,6 +77,7 @@ scales_dictionary <-
   append_scale_to_dictionary(scales_dictionary,
                              scale = "building",
                              sing = "building",
+                             sing_with_article = "the building",
                              plur = "buildings",
                              slider_title = "Building",
                              place_heading = "{name}",
@@ -93,6 +94,7 @@ scales_dictionary <-
   append_scale_to_dictionary(scales_dictionary,
                              scale = "cmhczone",
                              sing = "CMHC zone",
+                             sing_with_article = "the CMHC zone",
                              plur = "CMHC zones",
                              slider_title = "CMHC zone",
                              place_heading = "{name}",
@@ -254,9 +256,16 @@ tileset_upload_all(all_scales = all_scales_t,
 
 # Did you know ------------------------------------------------------------
 
-# variables <- scales_variables_modules$variables
-# source("dev/other/dyk.R")
-# qs::qsave(dyk, "data/dyk.qs")
+library(tidyverse)
+vars_dyk <- dyk_prep(scales_variables_modules, all_tables)
+dyk <- dyk_uni(vars_dyk, 
+               svm = scales_variables_modules, 
+               translation_df = NULL,
+               langs = c("en"), 
+               scales_dictionary = scales_dictionary)
+# dyk <- rbind(dyk, dyk_delta(vars_dyk, scales_variables_modules))
+# dyk <- rbind(dyk, dyk_bivar(vars_dyk, scales_variables_modules))
+qs::qsave(dyk, "data/dyk.qs")
 
 
 # Produce colours ---------------------------------------------------------

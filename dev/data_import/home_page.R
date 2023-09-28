@@ -15,7 +15,7 @@ home_page <- function(modules, stories = NULL, data_path = "data/") {
   
   
   # Path to the top-left corner SVG image of  -------------------------------
-  c_city_svg <- "www/landing/c-comox.svg"
+  c_city_svg <- "www/landing/c-vancouver.svg"
   
   
   # Tibble for the news section ---------------------------------------------
